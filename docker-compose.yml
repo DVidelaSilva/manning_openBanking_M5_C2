@@ -1,0 +1,54 @@
+version: "3.8"
+services:
+  better-banking-cache:
+    container_name: better-banking-redis
+    image: redis:latest
+    command: [ "redis-server", "--protected-mode", "no" ]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data  # Persistencia de datos de Redis
+    deploy:
+      replicas: 1
+    restart: always
+  better-banking-db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=caching_sha2_password
+    container_name: mysql_openbanking
+    restart: always
+    environment:
+      MYSQL_USERNAME: root
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: open_banking_manning
+      MYSQL_ROOT_HOST: '%'                           # Nombre de usuario (opcional)
+    ports:
+      - "33061:3306"  # Mapea el puerto 3306 del contenedor al puerto 3306 del host
+    volumes:
+      - mysql_data:/var/lib/mysql  # Monta los datos de MySQL en un volumen para persistencia
+    healthcheck:
+      test: ["CMD", "mysql", "-h", "localhost", "-u", "root", "-proot", "-e", "SELECT 1"]
+      interval: 10s
+      retries: 5
+  better-banking:
+    container_name: better-banking
+    image: better-banking:latest
+    ports:
+      - 9000:9000
+    restart: on-failure
+    depends_on:
+      better-banking-db:
+        condition: service_healthy
+    links:
+      - better-banking-db
+      - better-banking-cache
+    environment:
+      - testnet.integration.client=better-banking
+      - testnet.integration.secret=7yrbR8XpY45bcKPP
+      - MYSQL_HOST=acme-banking-db
+      - io.betterbanking.integration.url-base=http://host.docker.internal:8080
+ 
+
+
+volumes:
+  mysql_data:
+  redis_data:
